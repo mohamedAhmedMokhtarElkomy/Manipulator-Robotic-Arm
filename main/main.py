@@ -1,48 +1,48 @@
-# from pyPS4Controller.controller import Controller
-# from serial import *
-# import time
-#
-#
-# class MyController(Controller):
-#
-#     def __init__(self, **kwargs):
-#         Controller.__init__(self, **kwargs)
-#
-#
-# controller = MyController(interface="/dev/input/js0", connecting_using_ds4drv=False)
-#
-# serialcomm = Serial('/dev/ttyACM0', 9600)
-#
-# # serialcomm = serial.Serial('/dev/ttyACM0')
-# serialcomm.timeout = 1
-#
-# def on_x_press(self):
-#     serialcomm.write(1)
-#     print("sent")
-# controller.listen()
-#
-
-
-import subprocess
-
-subprocess.run(['pip','install','--upgrade', 'pip'])
-
-subprocess.run(['pip','install','pyserial'])
-
-
-import serial
 from pyPS4Controller.controller import Controller
+from threading import Thread, Event
+import RPi.GPIO as GPIO
+import time
 
-send = False
-def sending(char):
-    send = True
-    while send:
-        serialcomm.write(bytearray(char, 'ascii'))
-        print("L3_up")
+usleep = lambda x: time.sleep(x/1000000.0)
+usleep(100)
 
-def stopSending():
-    send = False
-    print("=======================================================")
+#SERVO
+#GPIO.setmode(GPIO.BOARD)
+#GPIO.setup(11,GPIO.OUT)
+#pwm=GPIO.PWM(11, 50)
+
+#ELBOW STEPPER MOTOR
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(10,GPIO.OUT)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(12,GPIO.OUT)
+
+
+
+elbowEvent = Event()
+shoulderEvent = Event()
+
+def setAngle(angle):
+    duty = angle / 18 + 3
+    GPIO.output(11, True)
+    pwm.ChangeDutyCycle(duty)
+    time.sleep(1)
+    GPIO.output(11, False)
+    pwm.ChangeDutyCycle(duty)
+
+
+def rotate(event, pin_step):
+    print("thread is running")
+    while(1):
+        if event.is_set():        
+            GPIO.output(pin_step, True)
+            
+        usleep(10000)
+        GPIO.output(pin_step, False)
+        usleep(10000)
+
+#pwm.start(0)
+#setAngle(80)
 
 class MyController(Controller):
 
@@ -50,52 +50,57 @@ class MyController(Controller):
         Controller.__init__(self, **kwargs)
 
     def on_R1_press(self):
-        serialcomm.write(bytearray('u', 'ascii'))
-        print("press R1")
+        GPIO.output(12, True)
+        shoulderEvent.set()
+        print("on_R1_press")
+        
     def on_R1_release(self):
-        serialcomm.write(bytearray('0', 'ascii'))
-        print("release R1")
+        shoulderEvent.clear()
+        print("on_R1_release")
+        
     def on_R2_press(self, value):
-        serialcomm.write(bytearray('d', 'ascii'))
-        print("press R2")
+        GPIO.output(12, False)
+        shoulderEvent.set()
+        
     def on_R2_release(self):
-        serialcomm.write(bytearray('0', 'ascii'))
-        print("release R2")
+        shoulderEvent.clear()
+        
     def on_L1_press(self):
-        serialcomm.write(bytearray('f', 'ascii'))
+
         print("press L1")
     def on_L1_release(self):
-        serialcomm.write(bytearray('0', 'ascii'))
+
         print("release L1")
     def on_L2_press(self, value):
-        serialcomm.write(bytearray('b', 'ascii'))
+
         print("press L2")
     def on_L2_release(self):
-        serialcomm.write(bytearray('0', 'ascii'))
+
         print("release L2")
     def on_right_arrow_press(self):
-        serialcomm.write(bytearray('r', 'ascii'))
+
         print("press right arrow")
     def on_left_arrow_press(self):
-        serialcomm.write(bytearray('l', 'ascii'))
+
         print("press left arrow")
     def on_left_right_arrow_release(self):
-        serialcomm.write(bytearray('0', 'ascii'))
+
         print("release arrows")
 
     def on_x_press(self):
-        serialcomm.write(bytearray('x','ascii'))
+        setAngle(140)
+        print("x")
 
     def on_square_press(self):
-        serialcomm.write(bytearray('s','ascii'))
+        setAngle(80)
+        print("y")
 
+t1 = Thread(target=rotate, args=(shoulderEvent, 10))
+#t2 = Thread(target=shoulder, args=(shoulderEvent, 1))
+t1.start()
+#t2.start()
 
 controller = MyController(interface="/dev/input/js0", connecting_using_ds4drv=False)
-
-serialcomm = serial.Serial("/dev/ttyACM0", 9600)
-serialcomm.close()
-serialcomm.open()
-serialcomm.timeout = 1
-
 controller.listen()
 
+#rotate(10)
